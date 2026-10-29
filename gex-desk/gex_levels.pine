@@ -1,0 +1,26 @@
+//@version=5
+indicator("GEX Levels", overlay=true, max_lines_count=30, max_labels_count=30)
+
+levels = input.string("", "Levels (paste from COPY LEVELS)")
+mult   = input.float(1.0, "Multiplier (e.g. NQ/QQQ ratio)", step=0.01)
+
+var line[]  ls = array.new_line()
+var label[] lb = array.new_label()
+
+if barstate.islast
+    for l in ls
+        line.delete(l)
+    for b in lb
+        label.delete(b)
+    array.clear(ls)
+    array.clear(lb)
+    items = str.split(levels, ",")
+    for it in items
+        kv = str.split(it, "=")
+        if array.size(kv) == 2
+            nm = array.get(kv, 0)
+            px = str.tonumber(array.get(kv, 1)) * mult
+            if not na(px)
+                col = str.contains(nm, "call") ? color.green : str.contains(nm, "put") ? color.red : str.contains(nm, "flip") ? color.orange : str.contains(nm, "sd") ? color.gray : color.blue
+                array.push(ls, line.new(bar_index - 1, px, bar_index, px, extend=extend.both, color=col, style=line.style_dashed))
+                array.push(lb, label.new(bar_index, px, nm + " " + str.tostring(px, "#.##"), style=label.style_label_left, color=color.new(col, 75), textcolor=color.white))
