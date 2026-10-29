@@ -1,0 +1,56 @@
+//@version=5
+indicator("Sushi GEX Levels", overlay=true, max_lines_count=60, max_labels_count=60, max_boxes_count=30)
+
+// ---------- inputs
+levelsStr = input.string("", "Levels (paste from Sushi Terminal)", group="Data")
+refSym    = input.symbol("NASDAQ:QQQ", "Symbol the levels came from", group="Data")
+autoRatio = input.bool(true, "Auto-convert to this chart's price", group="Data")
+manMult   = input.float(1.0, "Manual multiplier (when auto is off)", step=0.01, group="Data")
+showLbl   = input.bool(true, "Show labels", group="Style")
+showPx    = input.bool(true, "Show price in label", group="Style")
+bandPct   = input.float(0.05, "Flip band thickness %", step=0.01, group="Style")
+lblSize   = input.string("small", "Label size", options=["tiny", "small", "normal"], group="Style")
+
+// ---------- price conversion (e.g. QQQ levels shown on NQ)
+refClose = request.security(refSym, timeframe.period, close)
+ratio    = autoRatio ? (na(refClose) ? 1.0 : close / refClose) : manMult
+lsz      = lblSize == "tiny" ? size.tiny : lblSize == "normal" ? size.normal : size.small
+
+// ---------- helpers
+pretty(k) =>
+    k == "callwall" ? "Call Wall" : k == "putwall" ? "Put Wall" : k == "flip" ? "Gamma Flip" : k == "maxpain" ? "Max Pain" : k == "callwall0" ? "Call Wall 0DTE" : k == "putwall0" ? "Put Wall 0DTE" : k == "flip0" ? "Gamma Flip 0DTE" : k == "up1sd" ? "+1σ" : k == "dn1sd" ? "-1σ" : str.startswith(k, "g") ? "Γ-" + str.substring(k, 1) : k
+
+colorFor(k) =>
+    (k == "callwall" or k == "callwall0") ? #ff4d6d : (k == "putwall" or k == "putwall0") ? #2ee6a6 : k == "flip" ? #cfd3da : k == "flip0" ? #a78bfa : k == "maxpain" ? #f5c542 : str.startswith(k, "g") ? #3aa0ff : #8b93a1
+
+// ---------- drawing (redrawn on the last bar only)
+var line[]  lns = array.new<line>()
+var label[] lbs = array.new<label>()
+var box[]   bxs = array.new<box>()
+
+if barstate.islast
+    for l in lns
+        line.delete(l)
+    for b in lbs
+        label.delete(b)
+    for x in bxs
+        box.delete(x)
+    array.clear(lns)
+    array.clear(lbs)
+    array.clear(bxs)
+    items = str.split(levelsStr, ",")
+    for item in items
+        kv = str.split(item, "=")
+        if array.size(kv) == 2
+            k  = str.lower(array.get(kv, 0))
+            px = str.tonumber(array.get(kv, 1)) * ratio
+            if not na(px)
+                c = colorFor(k)
+                if k == "flip" or k == "flip0"
+                    half = px * bandPct / 100
+                    array.push(bxs, box.new(bar_index - 200, px + half, bar_index + 20, px - half, border_color=na, bgcolor=color.new(c, 80), extend=extend.right))
+                else
+                    array.push(lns, line.new(bar_index - 200, px, bar_index, px, extend=extend.right, color=c, width=(k == "callwall" or k == "putwall") ? 2 : 1, style=(k == "up1sd" or k == "dn1sd") ? line.style_dotted : line.style_solid))
+                if showLbl
+                    txt = pretty(k) + (showPx ? " " + str.tostring(px, format.mintick) : "")
+                    array.push(lbs, label.new(bar_index + 3, px, txt, style=label.style_label_left, color=color.new(c, 100), textcolor=c, size=lsz))

@@ -233,6 +233,14 @@ function drawGrid(){const M=TG;if(!M||!M.ks.length)return;const ks=[...M.ks].rev
  $('gleg').innerHTML=`<div style='display:flex;flex-direction:column;align-items:center;height:100%;font-size:9px;color:#6f7a95'><span>MAX</span><div style='flex:1;width:8px;margin:6px 0;background:linear-gradient(#34d27b,#0a0a0a,#f0505c)'></div><span>MAX</span></div>`;
  const ri=ks.indexOf(sk);$('grid').scrollTop=Math.max(0,ri*25-170)}
 
+// ---------- levels export
+function lvl(sel,spot){const gC={},gP={},gT={};sel.forEach(x=>{const v=ex(x,spot,'gamma','TRAD');gT[x.k]=(gT[x.k]||0)+v;const m=x.cp==='C'?gC:gP;m[x.k]=(m[x.k]||0)+v});
+ const cw=keys(gC)[0],pw=keys(gP).reverse()[0],lv=sel.filter(x=>x.iv>0&&x.oi>0);let flip=null,bd=1e9,pv=null,pS=null;
+ for(let i=0;i<=80;i++){const S=spot*(.9+.2*i/80),t=sum(lv,x=>ex(x,S,'gamma','TRAD'));if(pv!==null&&Math.sign(pv)!==Math.sign(t)){const f=pS-pv*(S-pS)/(t-pv);if(Math.abs(f-spot)<bd){bd=Math.abs(f-spot);flip=f}}pv=t;pS=S}
+ return{cw,pw,flip,g:Object.entries(gT).sort((a,b)=>Math.abs(b[1])-Math.abs(a[1])).slice(0,6).map(e=>+e[0])}}
+function levelString(S,spot){const as=DATA.o.filter(x=>x.dte<=+$('dte').value),fe=DATA.o.reduce((m,x)=>Math.min(m,x.exp),1e18),A=lvl(as,spot),Z=lvl(DATA.o.filter(x=>x.exp===fe),spot);
+ return [['callwall',A.cw],['putwall',A.pw],['flip',A.flip],['maxpain',S.mp],['callwall0',Z.cw],['putwall0',Z.pw],['flip0',Z.flip],...A.g.map((k,i)=>['g'+(i+1),k]),['up1sd',S.sig&&spot+S.sig],['dn1sd',S.sig&&spot-S.sig]].filter(a=>a[1]).map(a=>a[0]+'='+(+(+a[1]).toFixed(2))).join(',')}
+
 // ---------- render
 function render(){if(!DATA)return;const S=compute(),spot=S.spot,sy=sym.replace('_','');
  $('sync').textContent='SYNCED '+new Date().toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}).toUpperCase();const t0=Date.parse(String(DATA.ts).replace(' ','T')),ag=isNaN(t0)?null:Math.max(0,Date.now()-t0)/1000;$('age').innerHTML=ag===null?'':'<span style="color:'+(ag>1800?'var(--dn)':'var(--up)')+'">●</span> '+(ag>1800?'STALE FEED':'DELAYED FEED')+' · '+Math.floor(ag/60)+'M '+Math.floor(ag%60)+'S AGO';
@@ -240,7 +248,7 @@ function render(){if(!DATA)return;const S=compute(),spot=S.spot,sy=sym.replace('
  const c=(l,v,cl)=>`<div><i>${l}</i><b class="${cl||''}">${v}</b></div>`;
  $('st').innerHTML=`<div><i>${sy} · ${lbl}</i><b class="big">${spot.toFixed(2)}</b></div>`+c('CALL WALL',S.cw??'n/a','up')+c('PUT WALL',S.pw??'n/a','dn')+c('MAX PAIN',S.mp??'n/a')+c('G-FLIP',S.flip?S.flip.toFixed(2):'n/a')+c('Σ GEX',money(S.net),S.net>=0?'up':'dn')+c('Σ DEX',money(S.dex),S.dex>=0?'up':'dn')+c('Σ VANNA',money(S.vanna),S.vanna>=0?'up':'dn')+c('±1Σ',S.sig?S.sig.toFixed(2):'n/a')+c('P/C',S.pc.toFixed(2))+c('ATM IV',S.atm?(S.atm*100).toFixed(1)+'%':'n/a')+'<div style="margin-left:auto;display:flex;align-items:center;gap:16px;border:0"><button class="cp" onclick="copyLv()">⧉ COPY LEVELS</button><span class="up" style="font-size:10px;letter-spacing:.15em">● PINNED</span></div>';
  $('ins').textContent=(S.net>=0?'Positive':'Negative')+' gamma'+(S.conc>.4?', concentrated near spot.':', spread across strikes.')+(S.flip?` Spot is ${spot>S.flip?'above':'below'} the gamma flip (${S.flip.toFixed(2)}).`:'');
- $('ins').style.borderColor=S.net>=0?'#34d27b':'#f0505c';LV=[['callwall',S.cw],['putwall',S.pw],['flip',S.flip&&+S.flip.toFixed(2)],['maxpain',S.mp],['up1sd',S.sig&&+(spot+S.sig).toFixed(2)],['dn1sd',S.sig&&+(spot-S.sig).toFixed(2)]].filter(a=>a[1]).map(a=>a[0]+'='+a[1]).join(',');
+ $('ins').style.borderColor=S.net>=0?'#34d27b':'#f0505c';LV=levelString(S,spot);
  $('bt').textContent=`${greek.toUpperCase()} · ${lbl}`;$('b2t').textContent=`NET DELTA · ${lbl}`;$('b3t').textContent=`VANNA · ${lbl}`;$('tt').textContent=`${sy} · DEALER BOOK AS 3D RELIEF — STRIKE × EXPIRY`;
  $('tcap').textContent=`DEALER ${greek.toUpperCase()} · peak = call-side build · basin = put-side build · dashed = spot · drag to rotate · scroll to zoom · double-click to reset`;
  $('tape').innerHTML=[0,1].map(()=>[['SPOT',spot.toFixed(2)],['CALL WALL',S.cw],['PUT WALL',S.pw],['G-FLIP',S.flip&&S.flip.toFixed(2)],['Σ GEX',money(S.net)],['Σ DEX',money(S.dex)],['Σ VANNA',money(S.vanna)],['MAX PAIN',S.mp],['P/C',S.pc.toFixed(2)],['ATM IV',S.atm&&(S.atm*100).toFixed(1)+'%']].map(a=>`<span><i>${a[0]}</i><b>${a[1]??'n/a'}</b></span>`).join('')).join('');
